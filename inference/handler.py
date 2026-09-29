@@ -48,10 +48,22 @@ def load_model():
     if model_path is None:
         model_path = os.environ.get("MODEL_PATH", "/runpod-volume/models/v9-diffusion-merged")
 
-    # Fallback to HuggingFace
+    # Verify model is complete (need config.json AND at least one safetensors file)
+    import glob
+    model_complete = False
+    if os.path.exists(model_path):
+        has_config = os.path.exists(os.path.join(model_path, "config.json"))
+        has_weights = len(glob.glob(os.path.join(model_path, "*.safetensors"))) > 0
+        model_complete = has_config and has_weights
+
+    # Fallback to HuggingFace if volume model is missing or incomplete
     hf_model = os.environ.get("HF_MODEL", None)
-    if hf_model and not os.path.exists(model_path):
-        model_path = hf_model
+    if not model_complete:
+        if hf_model:
+            print(f"Volume model incomplete at {model_path} (config={has_config if os.path.exists(model_path) else 'N/A'}, weights={has_weights if os.path.exists(model_path) else 'N/A'}). Falling back to HF: {hf_model}")
+            model_path = hf_model
+        else:
+            print(f"WARNING: Volume model incomplete and no HF_MODEL set. Will attempt load from {model_path} anyway.")
 
     print(f"Loading model from {model_path}...")
     start = time.time()
